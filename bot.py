@@ -1,60 +1,54 @@
-#bot.py
+"""Entry point for the cleaned up Telegram bot."""
+
+from __future__ import annotations
+
 import logging
-from telegram import MessageEntity
+
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    InlineQueryHandler, CallbackQueryHandler, ContextTypes, filters
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    InlineQueryHandler,
+    MessageHandler,
+    filters,
 )
 
-from config import TOKEN, OWNER_ID, CACHE_CHAT_ID
-from state import set_bot_identity, get_pyro_app
-from utils.filters import build_media_filter
-from handlers.commands import start, id_cmd
-from handlers.files_id import send_file_ids
-from handlers.messages import handle_message
-from handlers.inline import inline_query
-from handlers.buttons import button_callback
-from handlers.cache_listener import cache_listener
-from services.cache_db import db_init
-from config import PYRO_API_ID, PYRO_API_HASH, PYRO_SESSION
-from pyrogram import Client as PyroClient
+import logging_setup  # noqa: F401 - configures logging on import
+from config import TOKEN
+from core.handlers import (
+    handle_callback_query,
+    handle_inline_query,
+    handle_url_message,
+    send_file_ids,
+    start_command,
+)
 
-URL_FILTER = (filters.Entity(MessageEntity.URL) | filters.CaptionEntity(MessageEntity.URL))
 
-async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+# What: Log unexpected errors raised by handlers instead of silently swallowing them.
+# Inputs: ``update``/``context`` parameters supplied by python-telegram-bot.
+# Outputs: None; writes the exception to the configured logger.
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.exception("Unhandled exception in handler", exc_info=context.error)
-    
-async def on_startup(app_):
-    db_init()
-    me = await app_.bot.get_me()
-    await set_bot_identity(me.username, me.id)  # <- ключевое, чтобы userbot слал в DM боту
-    logging.info(f"[BOT] Я @{me.username} (id={me.id})")
 
-    # мягкий старт Pyrogram (userbot). Если ENV не заданы — просто лог.
-    try:
-        await get_pyro_app()
-    except Exception as e:
-        logging.warning(f"[PYRO] skip start: {e}")
 
-async def on_shutdown(app_):
-    from state import close_pyro_app
-    await close_pyro_app()
+# What: Build and start the Telegram polling application.
+# Inputs: None; uses environment variables for configuration.
+# Outputs: None; blocks the process until the bot is stopped.
+def main() -> None:
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN is not configured")
 
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.User(OWNER_ID) & build_media_filter(), send_file_ids))
-    app.add_handler(CommandHandler("id", id_cmd, filters=filters.User(OWNER_ID)))
-    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & URL_FILTER, handle_message))
-    app.add_handler(MessageHandler((filters.ChatType.GROUP | filters.ChatType.SUPERGROUP) & URL_FILTER, handle_message))
-    app.add_handler(InlineQueryHandler(inline_query))
-    app.add_handler(CallbackQueryHandler(button_callback))
-    app.add_handler(MessageHandler(filters.Chat(chat_id=int(__import__('config').CACHE_CHAT_ID)) & filters.VIDEO, cache_listener))
-    app.add_error_handler(on_error)
-    app.post_init = on_startup
-    app.post_shutdown = on_shutdown
-    logging.info("[БОТ] Готов к работе")
-    app.run_polling()
+    application = ApplicationBuilder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(MessageHandler(filters.ALL, send_file_ids), group=0)
+    application.add_handler(MessageHandler(filters.ALL, handle_url_message), group=1)
+    application.add_handler(InlineQueryHandler(handle_inline_query))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+    application.add_error_handler(on_error)
+
+    logging.info("Bot is ready to receive updates")
+    application.run_polling()
 
 
 if __name__ == "__main__":
