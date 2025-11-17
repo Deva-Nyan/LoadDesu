@@ -6,14 +6,27 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 
-from config import PLACEHOLDER_PHOTO_ID
+from config import PLACEHOLDER_PHOTO_ID, ALLOWED_HOSTS
 from handlers import DOWNLOAD_TASKS
+from utils import is_url_allowed
 
 
 async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка inline-запросов"""
     url = update.inline_query.query.strip()
     if not url.startswith("http"):
+        return
+
+    if not is_url_allowed(url):
+        allowed = ", ".join(host for host in ALLOWED_HOSTS) if ALLOWED_HOSTS else ""
+        await update.inline_query.answer(
+            [],
+            cache_time=0,
+            is_personal=True,
+            switch_pm_text="Сайт не разрешён",
+            switch_pm_parameter="notallowed",
+        )
+        logging.warning(f"[INLINE] rejected not-allowed host: {url} (allowed: {allowed})")
         return
 
     task = uuid4().hex[:8]
