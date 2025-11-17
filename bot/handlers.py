@@ -9,12 +9,12 @@ from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 from telegram.constants import ChatType
 
-from config import OWNER_ID, CACHE_CHAT_ID, MAX_TG_SIZE, SMART_FMT_1080, MAX_PARALLEL
+from config import OWNER_ID, CACHE_CHAT_ID, MAX_TG_SIZE, SMART_FMT_1080, MAX_PARALLEL, ALLOWED_HOSTS
 from downloader import download_video_smart
 from video_processing import get_video_info, generate_thumbnail
 from userbot import send_via_userbot
 from formats import build_full_format_keyboard
-from utils import run_io, format_bytes
+from utils import run_io, format_bytes, is_url_allowed
 
 # Глобальные объекты
 DOWNLOAD_TASKS: dict[str, str] = {}
@@ -94,6 +94,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     url = text
     logging.info(f"[БОТ] Ссылка: {url}")
+
+    if not is_url_allowed(url):
+        allowed = ", ".join(host for host in ALLOWED_HOSTS) if ALLOWED_HOSTS else ""
+        msg = "Сайт не разрешён к загрузке." + (f"\nРазрешены: {allowed}" if allowed else "")
+        await update.message.reply_text(msg.strip())
+        return
+
     status = await update.message.reply_text("Скачиваю...")
 
     video_path = None

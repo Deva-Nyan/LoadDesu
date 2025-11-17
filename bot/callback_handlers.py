@@ -8,8 +8,8 @@ from telegram.error import BadRequest
 from handlers import DOWNLOAD_TASKS, DL_SEM
 from formats import build_full_format_keyboard
 from database import cache_get, cache_put
-from utils import run_io, get_content_key_and_title, detect_media_kind_and_key, extract_title_artist
-from config import CACHE_CHAT_ID, CACHE_THREAD_ID, MAX_TG_SIZE, SMART_FMT_1080
+from utils import run_io, get_content_key_and_title, detect_media_kind_and_key, extract_title_artist, is_url_allowed
+from config import CACHE_CHAT_ID, CACHE_THREAD_ID, MAX_TG_SIZE, SMART_FMT_1080, ALLOWED_HOSTS
 
 # Импорты функций для загрузки/обработки
 from downloader import (download_video_with_format, download_animation_source, 
@@ -33,8 +33,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         await query.edit_message_caption(caption="Ошибка: ссылка устарела или не найдена.")
         return
-    
+
     logging.info(f"[BTN] action={action} task={task_id} url={url}")
+
+    if not is_url_allowed(url):
+        allowed = ", ".join(host for host in ALLOWED_HOSTS) if ALLOWED_HOSTS else ""
+        await _set_caption("Сайт не разрешён к загрузке." + (f"\nРазрешены: {allowed}" if allowed else ""))
+        return
 
     # Helper для обновления подписи
     async def _set_caption(text: str, kb=None):

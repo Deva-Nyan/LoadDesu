@@ -8,6 +8,8 @@ import asyncio
 from typing import Optional, Tuple, Dict, Any
 from urllib.parse import urlparse
 
+from config import ALLOWED_HOSTS
+
 _YT_ID = re.compile(r'(?:v=|/shorts/|youtu\.be/)([A-Za-z0-9_-]{11})')
 
 
@@ -50,6 +52,28 @@ def _origin(url: str) -> str:
     """Возвращает origin URL"""
     u = urlparse(url)
     return f"{u.scheme}://{u.netloc}/"
+
+
+def _hostname(url: str) -> Optional[str]:
+    """Извлекает hostname (без порта) в нижнем регистре."""
+    host = urlparse(url).hostname
+    return host.lower() if host else None
+
+
+def is_url_allowed(url: str) -> bool:
+    """Проверяет, входит ли URL в белый список доменов."""
+    if not ALLOWED_HOSTS:
+        return True
+
+    host = _hostname(url)
+    if not host:
+        return False
+
+    for allowed in ALLOWED_HOSTS:
+        allowed = allowed.lstrip(".")
+        if host == allowed or host.endswith("." + allowed):
+            return True
+    return False
 
 
 async def run_io(func, *args, **kwargs):

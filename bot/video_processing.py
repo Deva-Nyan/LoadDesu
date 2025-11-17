@@ -1,9 +1,10 @@
 # video_processing.py
+import logging
 import os
 import subprocess
-import logging
 from pathlib import Path
 from typing import Optional
+
 from config import MAX_TG_SIZE
 
 

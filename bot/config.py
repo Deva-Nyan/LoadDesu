@@ -33,6 +33,16 @@ DEFAULT_UA = (
     "Chrome/124.0 Safari/537.36"
 )
 
+# Разрешённые домены для загрузки (через запятую, без схемы). Поддомены тоже разрешены.
+ALLOWED_HOSTS = [
+    host.strip().lower()
+    for host in os.getenv(
+        "ALLOWED_HOSTS",
+        "youtube.com,youtu.be,tiktok.com,vm.tiktok.com,instagram.com,facebook.com,fb.watch,x.com,twitter.com",
+    ).split(",")
+    if host.strip()
+]
+
 COOKIES_FILE = os.getenv("COOKIES_FILE", "")
 COOKIES_FROM_BROWSER = os.getenv("COOKIES_FROM_BROWSER", "")
 
